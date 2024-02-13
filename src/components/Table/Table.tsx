@@ -5,24 +5,16 @@ import "./Table.scss";
 
 export type DataItem = {
   id: number;
-  [key: string]:
-    | string
-    | Date
-    | boolean
-    | number
-    | Array<any>
-    | Record<string, unknown>
-    | null
-    | undefined;
+  [key: string]: string | Date | boolean | number | Array<any> | Record<string, unknown> | null | undefined;
 };
 
 type DataTableProps = {
   data: DataItem[];
-  onEdit: (id: number, data: DataItem[], newData: DataItem) => void;
 };
 
-const DataTable: React.FC<DataTableProps> = ({ data, onEdit }) => {
-  const [filteredData, setFilteredData] = useState<DataItem[]>(data);
+const DataTable: React.FC<DataTableProps> = ({ data }) => {
+  const [initialData, setInitialData] = useState<DataItem[]>(data);
+  const [filteredData, setFilteredData] = useState<DataItem[]>(initialData);
   const [filterValue, setFilterValue] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [editedRow, setEditedRow] = useState<DataItem | null>(null);
@@ -33,13 +25,29 @@ const DataTable: React.FC<DataTableProps> = ({ data, onEdit }) => {
     setSearchTerm("");
   }, [data]);
 
+  useEffect(() => {
+    setFilteredData(data);
+  }, [data]);
+
   const handleEditClick = (row: DataItem) => {
     editedRow === null ? setEditedRow(row) : setEditedRow(null);
   };
 
+  const handleEdit = (id: number, data: DataItem[], newData: DataItem) => {
+    const index = data.findIndex((item) => item.id === id);
+
+    if (index !== -1) {
+      const updatedDataArray = [...data.slice(0, index), newData, ...data.slice(index + 1)];
+
+      // Здесь можно отправить обновленные данные на API по индексу строки
+      // если получаем 200, обновляем текущий массив для визуального изменения
+      setInitialData(updatedDataArray);
+    }
+  };
+
   const handleSave = () => {
     if (editedRow) {
-      onEdit(editedRow.id, data, editedRow);
+      handleEdit(editedRow.id, data, editedRow);
       setEditedRow(null);
     }
   };
@@ -49,45 +57,32 @@ const DataTable: React.FC<DataTableProps> = ({ data, onEdit }) => {
     setFilterValue(value);
   };
 
-  const options = Object.keys(data[0]).filter(
-    (key) => typeof data[0][key as keyof DataItem] === "boolean"
-  );
+  const options = Object.keys(data[0]).filter((key) => typeof data[0][key as keyof DataItem] === "boolean");
 
   useEffect(() => {
-    let filteredArray = data;
+    let filteredArray = initialData;
 
     if (searchTerm) {
       const searchFilter = (item: DataItem) =>
         Object.values(item)
           .filter((value) => typeof value === "string")
-          .some(
-            (value) =>
-              typeof value === "string" &&
-              value.toLowerCase().includes(searchTerm.toLowerCase())
-          );
+          .some((value) => typeof value === "string" && value.toLowerCase().includes(searchTerm.toLowerCase()));
       filteredArray = filteredArray.filter(searchFilter);
     }
 
     if (filterValue) {
       const filterByBoolean = (item: DataItem) =>
-        typeof item[filterValue as keyof DataItem] === "boolean"
-          ? item[filterValue as keyof DataItem] === true
-          : false;
+        typeof item[filterValue as keyof DataItem] === "boolean" ? item[filterValue as keyof DataItem] === true : false;
       filteredArray = filteredArray.filter(filterByBoolean);
     }
 
     setFilteredData(filteredArray);
-  }, [searchTerm, filterValue]);
+  }, [searchTerm, filterValue, initialData]);
 
   return (
     <div className="table">
       <div className="table__actions">
-        <Input
-          value={searchTerm}
-          setValue={setSearchTerm}
-          placeholder="Search..."
-          className="table__search"
-        />
+        <Input value={searchTerm} setValue={setSearchTerm} placeholder="Search..." className="table__search" />
 
         <select onChange={handleFilterChange}>
           <option value="">All</option>
@@ -125,10 +120,7 @@ const DataTable: React.FC<DataTableProps> = ({ data, onEdit }) => {
               ))}
 
               <td className="table__edit-cell">
-                <button
-                  className="table__edit-button"
-                  onClick={() => handleEditClick(item)}
-                >
+                <button className="table__edit-button" onClick={() => handleEditClick(item)}>
                   Edit
                 </button>
               </td>
@@ -137,18 +129,11 @@ const DataTable: React.FC<DataTableProps> = ({ data, onEdit }) => {
         </tbody>
       </table>
 
-      {filteredData.length === 0 && (
-        <div className="table__unluck">
-          There is no data with such filters :(
-        </div>
-      )}
+      {filteredData.length === 0 && <div className="table__unluck">There is no data with such filters :(</div>}
 
       {editedRow && (
         <div className="table__modal">
-          <div
-            className="table__modal-bg"
-            onClick={() => setEditedRow(null)}
-          ></div>
+          <div className="table__modal-bg" onClick={() => setEditedRow(null)}></div>
           <div className="table__modal-content">
             {Object.entries(editedRow).map(([key, value]) => {
               if (typeof value === "string") {
